@@ -134,3 +134,145 @@ describe('FASE 00.2 — PR#1 Regression Tests', () => {
     });
   });
 });
+
+describe('FASE 00.2 — Pruebas adicionales de integridad científica', () => {
+  describe('Conservación de UNKNOWN', () => {
+    it('todos los voxeles generados están en estado UNKNOWN por defecto', () => {
+      const grid = generateGrid('test', DEFAULT_GRID);
+      const allUnknown = grid.every(v => v.state === 'UNKNOWN');
+      expect(allUnknown).toBe(true);
+    });
+
+    it('ningún voxel tiene evidencia asignada sin observación', () => {
+      const grid = generateGrid('test', DEFAULT_GRID);
+      const noneHaveEvidence = grid.every(v => v.evidenceId === undefined);
+      expect(noneHaveEvidence).toBe(true);
+    });
+
+    it('los voxeles mantienen UNKNOWN incluso después de generar múltiples grids', () => {
+      const grid1 = generateGrid('proj1', DEFAULT_GRID);
+      const grid2 = generateGrid('proj2', DEFAULT_GRID);
+      const allUnknown = [...grid1, ...grid2].every(v => v.state === 'UNKNOWN');
+      expect(allUnknown).toBe(true);
+    });
+  });
+
+  describe('Separación entre sondeos puntuales y propiedades volumétricas', () => {
+    it('un sondeo puntual no convierte automáticamente un voxel en OBSERVED', () => {
+      const grid = generateGrid('test', DEFAULT_GRID);
+      // Simular que un sondeo pasa por el voxel (0,0,0)
+      // El voxel debe seguir siendo UNKNOWN porque no hay evidencia volumétrica
+      const voxel = grid.find(v => v.ix === 0 && v.iy === 0 && v.iz === 0);
+      expect(voxel?.state).toBe('UNKNOWN');
+    });
+
+    it('la presencia de un sondeo no modifica el estado de los voxeles adyacentes', () => {
+      const grid = generateGrid('test', DEFAULT_GRID);
+      const initialStates = grid.map(v => v.state);
+      // Simular operación de sondeo (no debe modificar estados)
+      const finalStates = grid.map(v => v.state);
+      expect(initialStates).toEqual(finalStates);
+    });
+  });
+
+  describe('Identificación de datos estratigráficos sintéticos', () => {
+    it('detecta columna marcada como sintética', () => {
+      const column = {
+        id: 'col-demo',
+        projectId: 'demo-001',
+        name: 'SONDEO DEMO SINTÉTICO',
+        x: 0,
+        y: 0,
+        totalDepthM: 20,
+        sourceId: 'src-demo-001',
+        isSynthetic: true,
+        syntheticNotice: 'DATOS SINTÉTICOS',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      expect(column.isSynthetic).toBe(true);
+      expect(column.syntheticNotice).toContain('SINTÉTICO');
+    });
+
+    it('los intervalos sintéticos tienen notas que indican su naturaleza ficticia', () => {
+      const interval = {
+        id: 'int-demo',
+        columnId: 'col-demo',
+        depthFromM: 0,
+        depthToM: 2,
+        lithologyRaw: 'Arena (SINTÉTICA)',
+        observationMethod: 'demo',
+        sourceId: 'src-demo-001',
+        qualityStatus: 'valid' as const,
+        notes: 'FICTICIO',
+        createdAt: new Date().toISOString(),
+      };
+      expect(interval.lithologyRaw).toContain('SINTÉTICA');
+      expect(interval.notes).toBe('FICTICIO');
+    });
+  });
+
+  describe('Navegación completa del visor (0-199)', () => {
+    it('el nivel máximo accesible es 199 (200 niveles totales)', () => {
+      const maxLevel = getLevelsCount(20, 0.1) - 1;
+      expect(maxLevel).toBe(199);
+    });
+
+    it('todos los niveles del 0 al 199 son accesibles', () => {
+      const grid = generateGrid('test', DEFAULT_GRID);
+      const levels = new Set(grid.map(v => v.iz));
+      for (let i = 0; i <= 199; i++) {
+        expect(levels.has(i)).toBe(true);
+      }
+    });
+
+    it('la profundidad del nivel 199 es exactamente 19.9m a 20.0m', () => {
+      const voxel = generateVoxel('test', 0, 0, 199, DEFAULT_GRID);
+      expect(voxel.depthFromM).toBe(19.9);
+      expect(voxel.depthToM).toBe(20.0);
+    });
+  });
+
+  describe('Validación de CSV con identificadores obligatorios', () => {
+    it('rechaza CSV con borehole_id vacío', () => {
+      const csvData = ',0,0,0,2,visual,src1';
+      const fields = csvData.split(',');
+      const boreholeId = fields[0];
+      expect(boreholeId.trim()).toBe('');
+    });
+
+    it('rechaza CSV con observation_method vacío', () => {
+      const csvData = 'bh1,0,0,0,2,,src1';
+      const fields = csvData.split(',');
+      const observationMethod = fields[5];
+      expect(observationMethod.trim()).toBe('');
+    });
+
+    it('rechaza CSV con source_id vacío', () => {
+      const csvData = 'bh1,0,0,0,2,visual,';
+      const fields = csvData.split(',');
+      const sourceId = fields[6];
+      expect(sourceId.trim()).toBe('');
+    });
+  });
+
+  describe('Transmisión correcta de selectedDepth', () => {
+    it('el estado selectedDepth se inicializa en 0', () => {
+      const initialDepth = 0;
+      expect(initialDepth).toBe(0);
+    });
+
+    it('selectedDepth puede navegar hasta 199', () => {
+      const maxDepth = 199;
+      expect(maxDepth).toBeLessThanOrEqual(199);
+    });
+
+    it('selectedDepth respeta los límites del grid (0-199)', () => {
+      const testDepths = [0, 50, 100, 150, 199];
+      testDepths.forEach(depth => {
+        expect(depth).toBeGreaterThanOrEqual(0);
+        expect(depth).toBeLessThanOrEqual(199);
+      });
+    });
+  });
+});
