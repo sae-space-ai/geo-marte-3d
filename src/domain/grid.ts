@@ -14,7 +14,9 @@ export const DEFAULT_GRID: GridConfig = {
 };
 
 export function getLevelsCount(maxDepthM: number, verticalStepM: number): number {
-  return Math.round(maxDepthM / verticalStepM);
+  // CORRECCIÓN PR#1-5: Usar Math.floor para garantizar que no se exceda la profundidad máxima
+  // Math.round podría generar un nivel adicional por errores de punto flotante
+  return Math.floor(maxDepthM / verticalStepM + 0.0001); // +0.0001 para tolerancia de precisión
 }
 
 export function getDepthBoundsMm(iz: number, verticalStepM: number): { fromMm: number; toMm: number } {
@@ -47,6 +49,11 @@ export function generateVoxel(
   const { fromM, toM } = getDepthBoundsM(iz, config.verticalStepM);
   const { fromMm, toMm } = getDepthBoundsMm(iz, config.verticalStepM);
   const volume = parseFloat((config.cellSizeXM * config.cellSizeYM * config.verticalStepM).toFixed(6));
+
+  // CORRECCIÓN PR#1-5: Validación explícita para garantizar que ningún voxel exceda la profundidad máxima
+  if (toM > config.maxDepthM + 0.0001) {
+    throw new Error(`Voxel iz=${iz} excede profundidad máxima: ${toM}m > ${config.maxDepthM}m`);
+  }
 
   return {
     id: generateVoxelId(projectId, ix, iy, iz),

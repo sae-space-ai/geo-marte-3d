@@ -1,7 +1,7 @@
 // GEO-MARTE 3D — Visor 3D con React Three Fiber
 // Visualiza voxeles UNKNOWN sin inventar datos geológicos
 
-import { useRef, useMemo, useState } from 'react';
+import { useRef, useMemo, useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Text } from '@react-three/drei';
 import * as THREE from 'three';
@@ -35,9 +35,11 @@ function VoxelInstances({
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const [hovered, setHovered] = useState<number | null>(null);
 
+  // CORRECCIÓN PR#1-3: Los voxeles ya vienen prefiltrados desde App.tsx
+  // con la ventana deslizante de 40 niveles (0-20m completos)
   const visibleVoxels = useMemo(() => {
-    return voxels.filter(v => v.iz >= selectedDepth && v.iz < selectedDepth + maxVisibleDepth);
-  }, [voxels, selectedDepth, maxVisibleDepth]);
+    return voxels;
+  }, [voxels]);
 
   const { matrices, colors } = useMemo(() => {
     const mats: THREE.Matrix4[] = [];
@@ -65,15 +67,18 @@ function VoxelInstances({
     return { matrices: mats, colors: cols };
   }, [visibleVoxels, gridCellsX, gridCellsY, cellSizeXM, cellSizeYM, verticalStepM, selectedVoxelId]);
 
-  useMemo(() => {
+  // CORRECCIÓN PR#1-2: useEffect garantiza ejecución tras montaje del InstancedMesh
+  // (useMemo no es adecuado para efectos secundarios sobre refs de Three.js)
+  useEffect(() => {
     if (!meshRef.current) return;
+    const mesh = meshRef.current;
     matrices.forEach((matrix, i) => {
-      meshRef.current!.setMatrixAt(i, matrix);
-      meshRef.current!.setColorAt(i, colors[i]);
+      mesh.setMatrixAt(i, matrix);
+      mesh.setColorAt(i, colors[i]);
     });
-    meshRef.current.instanceMatrix.needsUpdate = true;
-    if (meshRef.current.instanceColor) {
-      meshRef.current.instanceColor.needsUpdate = true;
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) {
+      mesh.instanceColor.needsUpdate = true;
     }
   }, [matrices, colors]);
 
@@ -165,7 +170,8 @@ export default function Viewer3D({
   onVoxelClick,
   selectedVoxelId,
 }: Viewer3DProps) {
-  const maxVisibleDepth = 20;
+  // CORRECCIÓN PR#1-3: Ventana de 40 niveles (4m) para cubrir los 200 niveles
+  const maxVisibleDepth = 40;
   const totalWidth = gridCellsX * cellSizeXM;
   const totalHeight = gridCellsY * cellSizeYM;
 
