@@ -360,7 +360,7 @@ function VisorSection({
           cellSizeYM={currentProject?.cellSizeYM ?? 1}
           verticalStepM={currentProject?.verticalStepM ?? 0.1}
           maxDepthM={currentProject?.depthMaxM ?? 20}
-          selectedDepth={0}
+          selectedDepth={selectedDepth}
           onDepthChange={onDepthChange}
           onVoxelClick={onVoxelClick}
           selectedVoxelId={selectedVoxel?.id ?? null}
