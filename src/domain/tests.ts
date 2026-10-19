@@ -18,6 +18,16 @@ import {
   coordinateSchema,
 } from './validation';
 
+import {
+  validateColumn as validateStratColumn,
+  validateInterval as validateStratInterval,
+  validateColumnIntervals,
+  exportColumnToJSON,
+  exportColumnToCSV,
+  parseColumnCSV,
+  parseColumnJSON,
+} from '../database/stratigraphy';
+
 export interface TestResult {
   id: number;
   name: string;
@@ -241,12 +251,154 @@ export function runAllTests(): TestResult[] {
 
   // Test 20: Un intervalo grueso no se convierte en varias mediciones de 10 cm
   const thickInterval = { depthFromM: 0, depthToM: 5, observationMethod: 'visual', sourceId: 'src1' };
-  const impliedLevels = (thickInterval.depthToM - thickInterval.depthToM) / 0.1;
   results.push({
     id: 20,
     name: 'Intervalo grueso ≠ múltiples mediciones',
     passed: thickInterval.observationMethod === 'visual',
     message: 'Un intervalo de 5 m es UNA observación, no 50 mediciones de 10 cm',
+  });
+
+  // === Pruebas adicionales de columna estratigráfica ===
+
+  // Test 21: Validación de columna con coordenadas inválidas
+  const invalidColumn = validateStratColumn({
+    projectId: 'p1',
+    name: 'Test',
+    x: Infinity,
+    y: 0,
+    totalDepthM: 20,
+    sourceId: 'src1',
+  });
+  results.push({
+    id: 21,
+    name: 'Columna con X=Infinity rechazada',
+    passed: invalidColumn.length > 0,
+    message: invalidColumn.length > 0 ? 'Rechazado correctamente' : 'ERROR: Aceptó coordenada infinita',
+  });
+
+  // Test 22: Validación de intervalo con profundidad negativa
+  const negInterval = validateStratInterval({
+    columnId: 'c1',
+    depthFromM: -1,
+    depthToM: 2,
+    observationMethod: 'visual',
+    sourceId: 'src1',
+  });
+  results.push({
+    id: 22,
+    name: 'Intervalo con profundidad negativa rechazado',
+    passed: negInterval.length > 0,
+    message: negInterval.length > 0 ? 'Rechazado correctamente' : 'ERROR: Aceptó profundidad negativa',
+  });
+
+  // Test 23: Detección de solapamientos
+  const overlappingIntervals = [
+    { id: 'i1', columnId: 'c1', depthFromM: 0, depthToM: 5, observationMethod: 'visual', sourceId: 'src1', qualityStatus: 'valid' as const, createdAt: '' },
+    { id: 'i2', columnId: 'c1', depthFromM: 3, depthToM: 8, observationMethod: 'visual', sourceId: 'src1', qualityStatus: 'valid' as const, createdAt: '' },
+  ];
+  const overlapReport = validateColumnIntervals(overlappingIntervals, 20);
+  results.push({
+    id: 23,
+    name: 'Detección de solapamientos',
+    passed: overlapReport.overlaps.length > 0,
+    message: `${overlapReport.overlaps.length} solapamiento(s) detectado(s)`,
+  });
+
+  // Test 24: Detección de espacios UNKNOWN
+  const gappedIntervals = [
+    { id: 'i1', columnId: 'c1', depthFromM: 0, depthToM: 2, observationMethod: 'visual', sourceId: 'src1', qualityStatus: 'valid' as const, createdAt: '' },
+    { id: 'i2', columnId: 'c1', depthFromM: 5, depthToM: 8, observationMethod: 'visual', sourceId: 'src1', qualityStatus: 'valid' as const, createdAt: '' },
+  ];
+  const gapReport = validateColumnIntervals(gappedIntervals, 20);
+  results.push({
+    id: 24,
+    name: 'Detección de espacios UNKNOWN',
+    passed: gapReport.gaps.length > 0,
+    message: `${gapReport.gaps.length} espacio(s) UNKNOWN detectado(s)`,
+  });
+
+  // Test 25: Intervalo fuera de límites
+  const outOfBoundsIntervals = [
+    { id: 'i1', columnId: 'c1', depthFromM: 18, depthToM: 25, observationMethod: 'visual', sourceId: 'src1', qualityStatus: 'valid' as const, createdAt: '' },
+  ];
+  const oobReport = validateColumnIntervals(outOfBoundsIntervals, 20);
+  results.push({
+    id: 25,
+    name: 'Intervalo fuera de límites detectado',
+    passed: oobReport.outOfBounds.length > 0,
+    message: `${oobReport.outOfBounds.length} intervalo(s) fuera de límites`,
+  });
+
+  // Test 26: Exportación JSON válida
+  const testCol = {
+    id: 'test-col',
+    projectId: 'demo-001',
+    name: 'Test Column',
+    x: 0,
+    y: 0,
+    totalDepthM: 20,
+    sourceId: 'src-demo-001',
+    isSynthetic: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  const testIntervals = [
+    { id: 'i1', columnId: 'test-col', depthFromM: 0, depthToM: 2, observationMethod: 'demo', sourceId: 'src-demo-001', qualityStatus: 'valid' as const, createdAt: new Date().toISOString() },
+  ];
+  const jsonExport = exportColumnToJSON(testCol as any, testIntervals as any);
+  let jsonValid = false;
+  try {
+    const parsed = JSON.parse(jsonExport);
+    jsonValid = parsed.schemaVersion === 2 && parsed.column && Array.isArray(parsed.intervals);
+  } catch {}
+  results.push({
+    id: 26,
+    name: 'Exportación JSON válida',
+    passed: jsonValid,
+    message: jsonValid ? 'JSON exportado correctamente con schemaVersion 2' : 'ERROR: JSON inválido',
+  });
+
+  // Test 27: Exportación CSV válida
+  const csvExport = exportColumnToCSV(testCol as any, testIntervals as any);
+  const csvValid = csvExport.includes('column_id') && csvExport.includes('depth_from_m') && csvExport.includes('depth_to_m');
+  results.push({
+    id: 27,
+    name: 'Exportación CSV válida',
+    passed: csvValid,
+    message: csvValid ? 'CSV exportado con cabeceras correctas' : 'ERROR: CSV sin cabeceras',
+  });
+
+  // Test 28: Parseo CSV con validación
+  const validCSV = 'column_id,column_name,x_m,y_m,total_depth_m,source_id,is_synthetic,depth_from_m,depth_to_m,lithology_raw,observation_method\ncol1,Test,0,0,20,src1,false,0,2,Arena,visual';
+  const parsedCSV = parseColumnCSV(validCSV);
+  results.push({
+    id: 28,
+    name: 'Parseo CSV válido',
+    passed: parsedCSV.errors.length === 0 && parsedCSV.intervals.length === 1,
+    message: parsedCSV.errors.length === 0 ? 'CSV parseado sin errores' : `Errores: ${parsedCSV.errors.join(', ')}`,
+  });
+
+  // Test 29: Parseo CSV con errores
+  const invalidCSV = 'column_id,x_m\nonly_one_column';
+  const parsedInvalidCSV = parseColumnCSV(invalidCSV);
+  results.push({
+    id: 29,
+    name: 'Parseo CSV malformado rechazado',
+    passed: parsedInvalidCSV.errors.length > 0,
+    message: parsedInvalidCSV.errors.length > 0 ? 'CSV malformado rechazado' : 'ERROR: Aceptó CSV malformado',
+  });
+
+  // Test 30: Parseo JSON válido
+  const validJSON = JSON.stringify({
+    column: { id: 'col1', name: 'Test', x: 0, y: 0, totalDepthM: 20, sourceId: 'src1' },
+    intervals: [{ depthFromM: 0, depthToM: 2, observationMethod: 'visual' }],
+  });
+  const parsedJSON = parseColumnJSON(validJSON);
+  results.push({
+    id: 30,
+    name: 'Parseo JSON válido',
+    passed: parsedJSON.errors.length === 0 && parsedJSON.intervals.length === 1,
+    message: parsedJSON.errors.length === 0 ? 'JSON parseado sin errores' : `Errores: ${parsedJSON.errors.join(', ')}`,
   });
 
   return results;
