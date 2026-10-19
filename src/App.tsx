@@ -7,9 +7,10 @@ import { Voxel, KNOWLEDGE_LABELS, KNOWLEDGE_COLORS } from './domain/types';
 import { DEFAULT_GRID, countVoxels, countUnknownVoxels } from './domain/grid';
 import { createInitialState, getProjectStats, AppState } from './domain/store';
 import Viewer3D from './features/viewer3d/Viewer3D';
+import StratigraphicColumn from './features/stratigraphy/StratigraphicColumn';
 import { validateBorehole, validateGrainSize } from './domain/validation';
 
-type Section = 'inicio' | 'proyectos' | 'visor' | 'sondeos' | 'muestras' | 'fuentes' | 'importacion' | 'control' | 'mars' | 'docs';
+type Section = 'inicio' | 'proyectos' | 'visor' | 'columna' | 'sondeos' | 'muestras' | 'fuentes' | 'importacion' | 'control' | 'mars' | 'docs';
 
 function App() {
   const [state, setState] = useState<AppState>(createInitialState());
@@ -40,6 +41,7 @@ function App() {
     { id: 'inicio', label: 'Inicio', icon: 'fa-home' },
     { id: 'proyectos', label: 'Proyectos', icon: 'fa-folder' },
     { id: 'visor', label: 'Visor 3D', icon: 'fa-cube' },
+    { id: 'columna', label: 'Columna estratigráfica', icon: 'fa-layer-group' },
     { id: 'sondeos', label: 'Sondeos', icon: 'fa-arrow-down' },
     { id: 'muestras', label: 'Muestras', icon: 'fa-vial' },
     { id: 'fuentes', label: 'Fuentes', icon: 'fa-database' },
@@ -134,6 +136,7 @@ function App() {
               onVoxelClick={handleVoxelClick}
             />
           )}
+          {activeSection === 'columna' && <StratigraphicColumn />}
           {activeSection === 'sondeos' && <SondeosSection state={state} />}
           {activeSection === 'muestras' && <MuestrasSection />}
           {activeSection === 'fuentes' && <FuentesSection state={state} />}
