@@ -332,17 +332,23 @@ function VisorSection({
   onDepthChange: (d: number) => void;
   onVoxelClick: (v: Voxel) => void;
 }) {
+  // CORRECCIÓN PR#1-3: El visor debe representar los 200 niveles completos (0-20m)
+  // Se usa una ventana deslizante de 40 niveles desde selectedDepth para rendimiento
   const displayVoxels = useMemo(() => {
-    // Para la demo 2x2 mostramos solo los primeros 20 niveles visibles
-    return state.voxels.filter(v => v.projectId === currentProject?.id && v.iz < 20);
-  }, [state.voxels, currentProject]);
+    const windowSize = 40; // 40 niveles = 4 metros visibles a la vez
+    return state.voxels.filter(
+      v => v.projectId === currentProject?.id &&
+           v.iz >= selectedDepth &&
+           v.iz < selectedDepth + windowSize
+    );
+  }, [state.voxels, currentProject, selectedDepth]);
 
   return (
     <div className="h-[calc(100vh-120px)] flex flex-col">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-xl font-bold text-white">Visor 3D</h2>
         <div className="text-xs text-gray-400">
-          Mostrando {displayVoxels.length} voxeles (demo limitada a 20 niveles para rendimiento)
+          Mostrando {displayVoxels.length} voxeles · Ventana de 40 niveles (4 m) desde nivel {selectedDepth} ({(selectedDepth * 0.1).toFixed(1)} m) · Total: 200 niveles (0-20 m)
         </div>
       </div>
       <div className="flex-1 rounded-xl overflow-hidden border border-gray-800">
@@ -354,7 +360,7 @@ function VisorSection({
           cellSizeYM={currentProject?.cellSizeYM ?? 1}
           verticalStepM={currentProject?.verticalStepM ?? 0.1}
           maxDepthM={currentProject?.depthMaxM ?? 20}
-          selectedDepth={selectedDepth}
+          selectedDepth={0}
           onDepthChange={onDepthChange}
           onVoxelClick={onVoxelClick}
           selectedVoxelId={selectedVoxel?.id ?? null}
@@ -587,12 +593,30 @@ function ImportacionSection() {
       }
 
       // Validar filas
+      // CORRECCIÓN PR#1-4: Validar que borehole_id, observation_method y source_id no estén vacíos
       const errors: string[] = [];
       lines.slice(1).forEach((line, idx) => {
         const cols = line.split(',').map(c => c.trim());
         if (cols.length !== headers.length) {
           errors.push(`Fila ${idx + 2}: número de columnas incorrecto`);
+          return;
         }
+        
+        // Validar campos obligatorios no vacíos
+        const boreholeId = cols[headers.indexOf('borehole_id')];
+        const observationMethod = cols[headers.indexOf('observation_method')];
+        const sourceId = cols[headers.indexOf('source_id')];
+        
+        if (!boreholeId || boreholeId.trim() === '') {
+          errors.push(`Fila ${idx + 2}: borehole_id vacío o faltante`);
+        }
+        if (!observationMethod || observationMethod.trim() === '') {
+          errors.push(`Fila ${idx + 2}: observation_method vacío o faltante`);
+        }
+        if (!sourceId || sourceId.trim() === '') {
+          errors.push(`Fila ${idx + 2}: source_id vacío o faltante`);
+        }
+        
         const depthFrom = parseFloat(cols[headers.indexOf('depth_from_m')]);
         const depthTo = parseFloat(cols[headers.indexOf('depth_to_m')]);
         if (isNaN(depthFrom) || depthFrom < 0) errors.push(`Fila ${idx + 2}: depth_from_m inválido`);
