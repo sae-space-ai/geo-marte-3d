@@ -2,7 +2,7 @@
 
 **Proyecto:** Mineral-01  
 **Fase actual:** FASE 00 — Base ejecutable y verificable  
-**Estado:** Desarrollo activo
+**Estado:** ✅ COMPLETADO — Herramientas integradas y funcionales
 
 ---
 
@@ -46,10 +46,16 @@ Plataforma de representación del subsuelo terrestre con datos comprobables. Ins
 - Zod (validaciones)
 - sql.js (SQLite en navegador)
 
-### Persistencia
-- SQLite en navegador (sql.js)
+### Backend (Fase 01)
+- Fastify + TypeScript
+- better-sqlite3
 - Migraciones versionadas
-- LocalStorage para persistencia
+- API REST completa
+- Ver `apps/api/README.md`
+
+### Persistencia
+- **Fase 00:** SQLite en navegador (sql.js) + LocalStorage
+- **Fase 01:** SQLite servidor (better-sqlite3) + Backend Fastify
 
 ---
 
@@ -74,23 +80,36 @@ npm run typecheck
 ## Estructura del proyecto
 
 ```
-src/
-├── App.tsx                    # Aplicación principal
-├── main.tsx                   # Entry point
-├── index.css                  # Estilos
-├── domain/
-│   ├── types.ts               # Tipos TypeScript
-│   ├── grid.ts                # Generador de malla de voxeles
-│   ├── validation.ts          # Validadores Zod
-│   ├── store.ts               # Estado de la aplicación
-│   └── tests.ts               # 20 pruebas ejecutables
-├── database/
-│   └── sqlite.ts              # Persistencia SQLite + migraciones
-├── services/
-│   └── api.ts                 # Capa de servicios (simula API REST)
-└── features/
-    └── viewer3d/
-        └── Viewer3D.tsx       # Visor 3D
+├── src/                       # Frontend
+│   ├── App.tsx                # Aplicación principal
+│   ├── main.tsx               # Entry point
+│   ├── domain/
+│   │   ├── types.ts           # Tipos TypeScript
+│   │   ├── grid.ts            # Generador de malla de voxeles
+│   │   ├── validation.ts      # Validadores Zod
+│   │   ├── store.ts           # Estado de la aplicación
+│   │   ├── tests.ts           # 35 pruebas (navegador)
+│   │   └── tests.vitest.ts    # 35 pruebas (Vitest)
+│   ├── database/
+│   │   ├── sqlite.ts          # Persistencia SQLite + migraciones
+│   │   └── stratigraphy.ts    # Columnas estratigráficas
+│   ├── services/
+│   │   └── api.ts             # Capa de servicios (simula API REST)
+│   └── features/
+│       ├── viewer3d/          # Visor 3D
+│       ├── stratigraphy/      # Columna estratigráfica
+│       └── tools/             # Herramientas adicionales
+│           ├── VolumeCalculator.tsx
+│           ├── ScientificExporter.tsx
+│           └── ScientificReport.tsx
+└── apps/api/                  # Backend Fastify (Fase 01)
+    ├── src/
+    │   ├── server.ts          # Entry point
+    │   ├── app.ts             # Configuración Fastify
+    │   ├── database/          # SQLite + migraciones
+    │   └── routes/            # API REST
+    ├── package.json
+    └── README.md
 ```
 
 ---
@@ -100,13 +119,17 @@ src/
 1. **Inicio** — Resumen del proyecto y configuración
 2. **Proyectos** — Gestión de proyectos
 3. **Visor 3D** — Visualización de voxeles con Three.js
-4. **Sondeos** — Registro de sondeos con validación
-5. **Muestras** — Gestión de muestras y análisis
-6. **Fuentes** — Catálogo de fuentes de evidencia
-7. **Importación** — Importación CSV con previsualización
-8. **Control científico** — Verificación de integridad y pruebas
-9. **Tecnología marciana** — Documentación de instrumentos NASA
-10. **Documentación** — Principios y referencias
+4. **Columna estratigráfica** — Visualización vertical de intervalos
+5. **Calculadora volúmenes** — Cálculo de volúmenes de intervalos
+6. **Exportar datos** — Exportación con metadatos de procedencia
+7. **Reporte científico** — Informe de integridad científica
+8. **Sondeos** — Registro de sondeos con validación
+9. **Muestras** — Gestión de muestras y análisis
+10. **Fuentes** — Catálogo de fuentes de evidencia
+11. **Importación** — Importación CSV/JSON con previsualización
+12. **Control científico** — Verificación de integridad y 35 pruebas
+13. **Tecnología marciana** — Documentación de instrumentos NASA
+14. **Documentación** — Principios y referencias
 
 ---
 
